@@ -206,7 +206,7 @@ export class LiveDataStream<T = unknown> {
       });
 
       return () => {
-        // TODO: potentially resize the buffer on unsubscribe
+        // TODO: potentially resize (downside) the buffer on unsubscribe
         sub.unsubscribe();
 
         if (!this.dataQueryResponseStream.observed) {
