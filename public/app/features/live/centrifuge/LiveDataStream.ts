@@ -161,7 +161,7 @@ export class LiveDataStream<T = unknown> {
     const fieldPredicate = dataNeedsFiltering ? ({ name }: Field) => fieldsNamesFilter.includes(name) : undefined;
 
     let fullDataPacketSent = false;
-    const transformedSubject = this.dataQueryResponseStream.pipe(
+    const transformedDataQueryResponseStream = this.dataQueryResponseStream.pipe(
       map((next) => {
         const dataFrame = next.data[0] ? toFilteredDataFrameDTO(next.data[0], fieldPredicate) : undefined;
 
@@ -193,7 +193,7 @@ export class LiveDataStream<T = unknown> {
     );
 
     return new Observable<DataQueryResponse>((subscriber) => {
-      const sub = transformedSubject.subscribe({
+      const sub = transformedDataQueryResponseStream.subscribe({
         next: (n) => {
           subscriber.next(n);
         },
