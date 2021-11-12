@@ -1,4 +1,4 @@
-import { MutableVector } from '../types/vector';
+import { MutableVector, Vector } from '../types/vector';
 import { FunctionalVector } from './FunctionalVector';
 
 /**
@@ -18,6 +18,13 @@ export class ArrayVector<T = any> extends FunctionalVector<T> implements Mutable
 
   add(value: T) {
     this.buffer.push(value);
+  }
+
+  concat(values: T[] | Vector<T>) {
+    // @ts-ignore
+    // TODO remove
+    this.buffer = this.buffer.concat(values);
+    return this;
   }
 
   get(index: number): T {

@@ -12,6 +12,7 @@ import { isSharedDashboardQuery, runSharedRequest } from '../../../plugins/datas
 // Types
 import {
   applyFieldOverrides,
+  ArrayVector,
   compareArrayValues,
   compareDataFrameStructures,
   CoreApp,
@@ -98,8 +99,55 @@ export class PanelQueryRunner {
           let fieldConfig = this.dataConfigSource.getFieldOverrideOptions();
           let processFields = fieldConfig != null;
 
+          // TODO: create new "chunk" dataframe type ?
+          const firstFrame = data.series[0];
+          const isChunk = 'isChunk' in firstFrame && ((firstFrame as unknown) as { isChunk: boolean }).isChunk;
+
+          if (
+            isChunk &&
+            data.state === LoadingState.Streaming &&
+            processFields &&
+            processedCount > 0 &&
+            lastData.length &&
+            lastConfigRev === this.dataConfigSource.configRev
+          ) {
+            // Keep the previous field config settings
+            processedData = {
+              ...processedData,
+              state: LoadingState.Streaming,
+              // @ts-ignore
+              series: lastData.map((frame, frameIndex) => {
+                const newFields = frame.fields.map((field, fieldIndex) => {
+                  // @ts-ignore
+                  // TODO: should be fixed with a new dateFrame type
+                  data.series[frameIndex].fields[fieldIndex].values.forEach((val) => {
+                    (field.values as ArrayVector<unknown>).add(val);
+                  });
+                  return {
+                    ...field,
+                    state: {
+                      ...field.state,
+                      // TODO: recalculate
+                      calcs: undefined,
+                      range: undefined,
+                    },
+                  };
+                });
+
+                return {
+                  ...frame,
+                  length: lastData[frameIndex].length + data.series[frameIndex].length || undefined,
+                  fields: newFields,
+                };
+              }),
+            };
+            processFields = false;
+            sameStructure = true;
+          }
+
           // If the shape is the same, we can skip field overrides
           if (
+            // TODO: create CircularDataFrame on first `streaming` message
             data.state === LoadingState.Streaming &&
             processFields &&
             processedCount > 0 &&

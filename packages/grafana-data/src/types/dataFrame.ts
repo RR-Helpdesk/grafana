@@ -209,6 +209,8 @@ export interface FieldDTO<T = any> {
 export interface DataFrameDTO extends QueryResultBase {
   name?: string;
   fields: Array<FieldDTO | Field>;
+  // TODO: remove
+  isChunk?: boolean;
 }
 
 export interface FieldCalcs extends Record<string, any> {}

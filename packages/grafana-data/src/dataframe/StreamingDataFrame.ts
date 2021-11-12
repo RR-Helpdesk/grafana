@@ -1,6 +1,6 @@
 import { Field, DataFrame, FieldType, Labels, QueryResultMeta } from '../types';
 import { ArrayVector } from '../vector';
-import { DataFrameJSON, decodeFieldValueEntities, FieldSchema } from './DataFrameJSON';
+import { DataFrameJSON, dataFrameToJSON, decodeFieldValueEntities, FieldSchema } from './DataFrameJSON';
 import { guessFieldTypeFromValue } from './processDataFrame';
 import { join } from '../transformations/transformers/joinDataFrames';
 import { AlignedData } from 'uplot';
@@ -56,7 +56,7 @@ export class StreamingDataFrame implements DataFrame {
   fields: Array<Field<any, ArrayVector<any>>> = [];
   length = 0;
 
-  options: StreamingFrameOptions;
+  options: Required<StreamingFrameOptions>;
 
   private schemaFields: FieldSchema[] = [];
   private timeFieldIndex = -1;
@@ -71,25 +71,43 @@ export class StreamingDataFrame implements DataFrame {
     length: 0,
   };
 
-  constructor(frame: DataFrameJSON, opts?: StreamingFrameOptions) {
+  constructor(frame?: DataFrameJSON, opts?: StreamingFrameOptions) {
     this.options = {
       maxLength: 1000,
       maxDelta: Infinity,
-      ...opts,
+      action: opts?.action ?? StreamingFrameAction.Append,
     };
     this.alwaysReplace = this.options.action === StreamingFrameAction.Replace;
 
-    this.push(frame);
+    if (frame) {
+      this.push(frame);
+    }
   }
+
+  needsResizing = ({ maxLength, maxDelta }: StreamingFrameOptions) => {
+    const needsHigherLength = maxLength && this.options.maxLength < maxLength;
+    const needsBiggerDelta = maxDelta && this.options.maxDelta < maxDelta;
+    return Boolean(needsHigherLength || needsBiggerDelta);
+  };
+
+  resized = ({ maxLength, maxDelta }: StreamingFrameOptions): StreamingDataFrame => {
+    const thisAsJson = dataFrameToJSON(this);
+    return new StreamingDataFrame(thisAsJson, {
+      maxDelta: Math.min(this.options.maxDelta, maxDelta ?? Infinity),
+      maxLength: Math.max(this.options.maxLength, maxLength ?? 0),
+      action: this.options.action,
+    });
+  };
 
   /**
    * apply the new message to the existing data.  This will replace the existing schema
    * if a new schema is included in the message, or append data matching the current schema
    */
-  push(msg: DataFrameJSON) {
+  push(msg: DataFrameJSON): StreamPacketInfo {
     const { schema, data } = msg;
 
     this.packetInfo.number++;
+    this.packetInfo.length = 0;
 
     if (schema) {
       this.pushMode = PushMode.wide;
@@ -221,7 +239,14 @@ export class StreamingDataFrame implements DataFrame {
       // Update the frame length
       this.length = appended[0].length;
     }
+
+    return {
+      // TODO: add schemaChange: boolean
+      ...this.packetInfo,
+    };
   }
+
+  hasAtLeastOnePacket = () => Boolean(this.packetInfo.length);
 
   // adds a set of fields for a new label
   private addLabel(label: string) {

@@ -18,6 +18,8 @@ export class MutableDataFrame<T = any> extends FunctionalVector<T> implements Da
   refId?: string;
   meta?: QueryResultMeta;
   fields: MutableField[] = [];
+  // TODO: remove
+  isChunk = false;
 
   private first: Vector = new ArrayVector();
   private creator: MutableVectorCreator;
@@ -49,6 +51,8 @@ export class MutableDataFrame<T = any> extends FunctionalVector<T> implements Da
           this.addField(f);
         }
       }
+      // TODO: remove
+      this.isChunk = `isChunk` in source ? Boolean(source.isChunk) : false;
     }
 
     // Get Length to show up if you use spread
